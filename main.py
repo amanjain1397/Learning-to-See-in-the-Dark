@@ -48,7 +48,7 @@ def main():
     eval_arg_parser.add_argument("--output_image", type=str, required=True,
                                  help="path for saving the output image")
     eval_arg_parser.add_argument("--model_path", type=str, required=True,
-                                  help="saved model to be used for stylizing the image")
+                                  help="saved model to be used")
     eval_arg_parser.add_argument("--cuda", type=int, default=1,
                                  help="set it to 1 for running on GPU, 0 for CPU, default is 1")
 
