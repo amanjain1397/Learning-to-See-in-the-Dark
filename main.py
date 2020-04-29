@@ -42,7 +42,7 @@ def main():
     train_arg_parser.add_argument("--checkpoint_model_dir", type=str, default='./checkpoints/',
                                   help="path to folder where checkpoints of trained models will be saved, default is ./checkpoints/")
     
-    eval_arg_parser = subparsers.add_parser("eval", help="parser for evaluation/stylizing arguments")
+    eval_arg_parser = subparsers.add_parser("eval", help="parser for evaluation arguments")
     eval_arg_parser.add_argument("--dark_image", type=str, required=True,
                                  help="path of the raw image (ARW) you want to evaluate")
     eval_arg_parser.add_argument("--output_image", type=str, required=True,
