@@ -5,6 +5,7 @@ import tqdm
 import os
 import re
 import numpy as np
+from PIL import Image
 
 import torch
 import torch.nn as nn
@@ -43,10 +44,10 @@ def main():
     
     eval_arg_parser = subparsers.add_parser("eval", help="parser for evaluation/stylizing arguments")
     eval_arg_parser.add_argument("--dark_image", type=str, required=True,
-                                 help="path to content image (.npy) you want to evaluate")
-    eval_arg_parser.add_argument("--output-image", type=str, required=True,
+                                 help="path of the raw image (ARW) you want to evaluate")
+    eval_arg_parser.add_argument("--output_image", type=str, required=True,
                                  help="path for saving the output image")
-    eval_arg_parser.add_argument("--model", type=str, required=True,
+    eval_arg_parser.add_argument("--model_path", type=str, required=True,
                                   help="saved model to be used for stylizing the image")
     eval_arg_parser.add_argument("--cuda", type=int, default=1,
                                  help="set it to 1 for running on GPU, 0 for CPU, default is 1")
@@ -130,6 +131,21 @@ def train(args):
     torch.save(network.state_dict(), save_model_path)
     print("\nDone, trained model saved at", save_model_path)
 
+def produce(args):
+    device = torch.device("cuda:0" if args.cuda  else 'cpu')
+    network = UNet().to(device)
+    network.load_state_dict(args.model_path)
+    network.eval()
+    
+    input_ = torch.tensor(pack_raw(args.dark_image)).to(args.device)
+    input_ = input_.permute(2, 0, 1).unsqueeze(0)
+    H, W = input_.shape[2:]
+
+    output = network(input_)
+    output = (np.clip(np.transpose(output.detach().squeeze(0).cpu().numpy(), (1,2,0)), 0., 1.) * 255).astype(np.uint8)
+    img = Image.fromarray(output).resize((W,H), Image.NEAREST)
+    img.save(args.output_image)
+
 def check_paths(args):
 
     try:
@@ -141,5 +157,23 @@ def check_paths(args):
         print(e)
         sys.exit(1)
 
+def pack_raw(filename):
+    # pack Bayer image to 4 channels
+    raw = rawpy.imread(filename)
+    im = raw.raw_image_visible.astype(np.float32)
+    im = np.maximum(im - 512, 0) / (16383 - 512)  # subtract the black level
+
+    im = np.expand_dims(im, axis=2)
+    img_shape = im.shape
+    H = img_shape[0]
+    W = img_shape[1]
+
+    out = np.concatenate((im[0:H:2, 0:W:2, :],
+                          im[0:H:2, 1:W:2, :],
+                          im[1:H:2, 1:W:2, :],
+                          im[1:H:2, 0:W:2, :]), axis=2)
+    return out
+
 if __name__ == "__main__":
     main()
+
