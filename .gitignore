@@ -1,4 +1,4 @@
 .ipynb_checkpoints
 .vscode
-checkpoint_result/
+./checkpoint_result/
 __pycache__
