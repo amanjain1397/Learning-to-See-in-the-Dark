@@ -13,8 +13,9 @@ import torch.nn.functional as F
 import torchvision
 from torchvision import transforms
 from torch.optim import Adam
-from utils.models import DarkDataset, UNet
 
+from utils.models import DarkDataset, UNet
+from utils.models import pack_raw, resize_bayer
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -45,6 +46,8 @@ def main():
     eval_arg_parser = subparsers.add_parser("eval", help="parser for evaluation arguments")
     eval_arg_parser.add_argument("--dark_image", type=str, required=True,
                                  help="path of the raw image (ARW) you want to evaluate")
+    eval_arg_parser.add_argument("--scale_percent", type=int, default = 100,
+                                 help="scale down the input bayer image by this percent (helpful for low memory GPUs), default is 100")
     eval_arg_parser.add_argument("--output_image", type=str, required=True,
                                  help="path for saving the output image")
     eval_arg_parser.add_argument("--model_path", type=str, required=True,
@@ -65,7 +68,7 @@ def main():
         check_paths(args)
         train(args)
     else:
-        evaluate(args)
+        produce(args)
 
 def train(args):
     device = torch.device("cuda:0" if args.cuda  else 'cpu')
@@ -134,16 +137,18 @@ def train(args):
 def produce(args):
     device = torch.device("cuda:0" if args.cuda  else 'cpu')
     network = UNet().to(device)
-    network.load_state_dict(args.model_path)
+    network.load_state_dict(torch.load(args.model_path))
     network.eval()
     
-    input_ = torch.tensor(pack_raw(args.dark_image)).to(args.device)
+    input_ = pack_raw(args.dark_image)
+    input_ = resize_bayer(input_, args.scale_percent)
+    input_ = torch.tensor(input_).to(args.device)
     input_ = input_.permute(2, 0, 1).unsqueeze(0)
     H, W = input_.shape[2:]
 
     output = network(input_)
     output = (np.clip(np.transpose(output.detach().squeeze(0).cpu().numpy(), (1,2,0)), 0., 1.) * 255).astype(np.uint8)
-    img = Image.fromarray(output).resize((W,H), Image.NEAREST)
+    img = Image.fromarray(output).resize((2 * W,2 * H), Image.BICUBIC)
     img.save(args.output_image)
 
 def check_paths(args):
@@ -156,23 +161,6 @@ def check_paths(args):
     except OSError as e:
         print(e)
         sys.exit(1)
-
-def pack_raw(filename):
-    # pack Bayer image to 4 channels
-    raw = rawpy.imread(filename)
-    im = raw.raw_image_visible.astype(np.float32)
-    im = np.maximum(im - 512, 0) / (16383 - 512)  # subtract the black level
-
-    im = np.expand_dims(im, axis=2)
-    img_shape = im.shape
-    H = img_shape[0]
-    W = img_shape[1]
-
-    out = np.concatenate((im[0:H:2, 0:W:2, :],
-                          im[0:H:2, 1:W:2, :],
-                          im[1:H:2, 1:W:2, :],
-                          im[1:H:2, 0:W:2, :]), axis=2)
-    return out
 
 if __name__ == "__main__":
     main()

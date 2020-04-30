@@ -1,6 +1,9 @@
 import math
 import numpy as np
 import os
+from PIL import Image
+import cv2
+import rawpy
 
 import torch
 import torch.nn as nn
@@ -25,6 +28,30 @@ def pixel_shuffle(input, upscale_factor, depth_first=False):
         shuffle_out = input_view.permute(0, 4, 1, 5, 2, 3).contiguous().view(batch_size, out_height, out_width,
                                                                              channels)
         return shuffle_out.permute(0, 3, 1, 2)
+
+def resize_bayer(img, scale_percent = 100):
+    width = int(img.shape[1] * scale_percent / 100)
+    height = int(img.shape[0] * scale_percent / 100)
+    dim = (width, height)
+    resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
+    return resized
+
+def pack_raw(filename):
+    # pack Bayer image to 4 channels
+    raw = rawpy.imread(filename)
+    im = raw.raw_image_visible.astype(np.float32)
+    im = np.maximum(im - 512, 0) / (16383 - 512)  # subtract the black level
+
+    im = np.expand_dims(im, axis=2)
+    img_shape = im.shape
+    H = img_shape[0]
+    W = img_shape[1]
+
+    out = np.concatenate((im[0:H:2, 0:W:2, :],
+                          im[0:H:2, 1:W:2, :],
+                          im[1:H:2, 1:W:2, :],
+                          im[1:H:2, 0:W:2, :]), axis=2)
+    return out
 
 class DarkDataset(Dataset):
     def __init__(self, txt_path, ps = 512):

@@ -1,2 +1,4 @@
 .ipynb_checkpoints
 .vscode
+./checkpoint_result/epoch_4000_512.pth.tar
+__pycache__

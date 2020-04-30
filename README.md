@@ -13,6 +13,7 @@ python main.py eval --dark_image </path/to/raw/image> --model_path </path/to/sav
 ```
 * `--dark_image` path of the raw image (ARW) you want to evaluate
 * `--model` saved model to be used
+* `--scale_percent` scale down the input bayer image by this percent (helpful for low memory GPUs), default is 100
 * `--output_image` path for saving the output image
 * `--cuda` set it to 1 for running on GPU, 0 for CPU. (default is 1)
 
